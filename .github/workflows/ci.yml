@@ -43,12 +43,7 @@ jobs:
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libudev-dev libasound2-dev libwayland-dev libxkbcommon-x11-dev \
-            libssl-dev libzstd-dev libvulkan-dev libgit2-dev make cmake clang \
-            mold libstdc++-12-dev
+        run: packaging/linux-build-deps.sh
 
       - name: Build
         run: cargo build --release --workspace

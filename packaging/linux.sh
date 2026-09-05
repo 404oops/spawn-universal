@@ -8,8 +8,7 @@
 #   sudo packaging/linux.sh --system   install for everyone, with the udev rule
 #
 # Build dependencies on Debian and Ubuntu:
-#   sudo apt install libudev-dev libwayland-dev libxkbcommon-x11-dev \
-#        libvulkan-dev cmake clang
+#   packaging/linux-build-deps.sh
 
 set -euo pipefail
 

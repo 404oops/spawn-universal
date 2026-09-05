@@ -5292,7 +5292,7 @@ dependencies = [
 
 [[package]]
 name = "spawn-app"
-version = "0.1.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -5307,7 +5307,7 @@ dependencies = [
 
 [[package]]
 name = "spawn-protocol"
-version = "0.1.0"
+version = "1.0.1"
 dependencies = [
  "thiserror 2.0.20",
 ]

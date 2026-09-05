@@ -47,11 +47,14 @@ sudo cp packaging/99-spawn.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
-Then unplug and replug the keyboard. Build dependencies on Debian/Ubuntu:
+Then unplug and replug the keyboard. Build dependencies on Debian and Ubuntu:
 
 ```bash
-sudo apt install libudev-dev libwayland-dev libxkbcommon-x11-dev libvulkan-dev cmake clang
+packaging/linux-build-deps.sh
 ```
+
+That script is the single list the CI workflows use too, so it cannot fall out of step
+with what actually builds.
 
 ### macOS and Windows
 
