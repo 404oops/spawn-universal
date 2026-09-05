@@ -1,0 +1,70 @@
+[package]
+name = "spawn-app"
+description = "Free-software configurator for SPAWN magnetic mechanical keyboards"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "spawn-universal"
+path = "src/main.rs"
+
+[dependencies]
+spawn-protocol = { path = "../spawn-protocol" }
+gpui.workspace = true
+gpui_ce_platform.workspace = true
+vampir.workspace = true
+hidapi = "2.6"
+anyhow = "1"
+crossbeam-channel = "0.5"
+log = "0.4"
+env_logger = "0.11"
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+
+# --- Linux packages -----------------------------------------------------------
+# `packaging/make-icon.py` has to run before either of these: both reference
+# generated files, and neither builds them.
+
+[package.metadata.deb]
+name = "spawn-universal"
+maintainer = "spawn-universal contributors"
+copyright = "spawn-universal contributors"
+license-file = ["../../LICENSE", "0"]
+extended-description = """\
+A free-software configurator for SONiX-based SPAWN magnetic (Hall-effect) \
+keyboards: per-key actuation and rapid trigger, key remapping, lighting and \
+calibration. Not affiliated with the manufacturer."""
+section = "utils"
+priority = "optional"
+assets = [
+    ["../../target/release/spawn-universal", "usr/bin/", "755"],
+    ["../../packaging/spawn-universal.desktop", "usr/share/applications/", "644"],
+    ["../../packaging/99-spawn.rules", "usr/lib/udev/rules.d/", "644"],
+    ["../../packaging/icons/icon-16.png", "usr/share/icons/hicolor/16x16/apps/spawn-universal.png", "644"],
+    ["../../packaging/icons/icon-32.png", "usr/share/icons/hicolor/32x32/apps/spawn-universal.png", "644"],
+    ["../../packaging/icons/icon-64.png", "usr/share/icons/hicolor/64x64/apps/spawn-universal.png", "644"],
+    ["../../packaging/icons/icon-128.png", "usr/share/icons/hicolor/128x128/apps/spawn-universal.png", "644"],
+    ["../../packaging/icons/icon-256.png", "usr/share/icons/hicolor/256x256/apps/spawn-universal.png", "644"],
+    ["../../packaging/icons/icon-512.png", "usr/share/icons/hicolor/512x512/apps/spawn-universal.png", "644"],
+    ["../../README.md", "usr/share/doc/spawn-universal/README.md", "644"],
+]
+
+[package.metadata.generate-rpm]
+name = "spawn-universal"
+summary = "Configurator for SPAWN magnetic keyboards"
+license = "GPL-3.0-or-later"
+assets = [
+    { source = "../../target/release/spawn-universal", dest = "/usr/bin/spawn-universal", mode = "755" },
+    { source = "../../packaging/spawn-universal.desktop", dest = "/usr/share/applications/spawn-universal.desktop", mode = "644" },
+    { source = "../../packaging/99-spawn.rules", dest = "/usr/lib/udev/rules.d/99-spawn.rules", mode = "644" },
+    { source = "../../packaging/icons/icon-64.png", dest = "/usr/share/icons/hicolor/64x64/apps/spawn-universal.png", mode = "644" },
+    { source = "../../packaging/icons/icon-128.png", dest = "/usr/share/icons/hicolor/128x128/apps/spawn-universal.png", mode = "644" },
+    { source = "../../packaging/icons/icon-256.png", dest = "/usr/share/icons/hicolor/256x256/apps/spawn-universal.png", mode = "644" },
+    { source = "../../packaging/icons/icon-512.png", dest = "/usr/share/icons/hicolor/512x512/apps/spawn-universal.png", mode = "644" },
+    { source = "../../README.md", dest = "/usr/share/doc/spawn-universal/README.md", mode = "644" },
+]

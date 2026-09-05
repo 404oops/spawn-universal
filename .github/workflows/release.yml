@@ -1,0 +1,205 @@
+name: Release
+
+# Packages for every platform. Tagging `v0.1.0` publishes a draft release with
+# the artefacts attached; a manual run builds them without publishing, which is
+# how to check a packaging change without cutting a version.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  macos:
+    name: macOS disk image
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # GPUI compiles Metal shaders, which need full Xcode rather than the
+      # command line tools.
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Build the disk image
+        run: packaging/macos.sh --dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  linux:
+    name: Linux packages
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libudev-dev libasound2-dev libwayland-dev libxkbcommon-x11-dev \
+            libssl-dev libzstd-dev libvulkan-dev libgit2-dev \
+            make cmake clang mold libstdc++-12-dev file desktop-file-utils
+
+      - name: Build
+        run: |
+          cargo build --release
+          python3 packaging/make-icon.py
+
+      # Both packagers read their file lists from Cargo.toml and neither
+      # builds anything, so the binary and the icons have to exist first.
+      - name: Debian package
+        run: |
+          cargo install cargo-deb --locked
+          cargo deb --no-build --no-strip -p spawn-app --output dist/
+
+      - name: RPM package
+        run: |
+          cargo install cargo-generate-rpm --locked
+          cargo generate-rpm -p crates/spawn-app
+          mkdir -p dist
+          cp target/generate-rpm/*.rpm dist/
+
+      - name: AppImage
+        run: |
+          set -euo pipefail
+          version="$(awk -F'"' '/^version/ {print $2; exit}' Cargo.toml)"
+
+          # linuxdeploy is the reference tool: it builds the AppDir to spec —
+          # AppRun, .DirIcon, the desktop file and icon at the top level, the
+          # right directory layout — and bundles the libraries the binary
+          # actually links. Assembling that by hand gets it subtly wrong.
+          base=https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous
+          curl -fsSL -o linuxdeploy "$base/linuxdeploy-x86_64.AppImage"
+          # `--output appimage` is a plugin, and it is found on PATH.
+          curl -fsSL -o linuxdeploy-plugin-appimage \
+            "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage"
+          chmod +x linuxdeploy linuxdeploy-plugin-appimage
+          export PATH="$PWD:$PATH"
+
+          # The runner has no FUSE, so the tools unpack themselves instead of
+          # mounting. VERSION is what names the output file.
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          export VERSION="$version"
+          export OUTPUT="spawn-universal-$version-x86_64.AppImage"
+
+          rm -rf AppDir
+          linuxdeploy \
+            --appdir AppDir \
+            --executable target/release/spawn-universal \
+            --desktop-file packaging/spawn-universal.desktop \
+            --icon-file packaging/icons/icon-256.png \
+            --icon-filename spawn-universal \
+            --output appimage
+
+          mkdir -p dist
+          mv "$OUTPUT" dist/
+
+      - name: Check the AppImage is well formed
+        run: |
+          set -euo pipefail
+          image="$(ls dist/*.AppImage)"
+          chmod +x "$image"
+          # The runtime's own flags, which every AppImage is expected to answer.
+          "$image" --appimage-help >/dev/null
+          "$image" --appimage-offset >/dev/null
+          "$image" --appimage-extract >/dev/null
+          # The layout the specification requires.
+          for f in squashfs-root/AppRun squashfs-root/.DirIcon \
+                   squashfs-root/spawn-universal.desktop \
+                   squashfs-root/usr/bin/spawn-universal; do
+            test -e "$f" || { echo "missing $f"; exit 1; }
+          done
+          desktop-file-validate squashfs-root/spawn-universal.desktop
+          rm -rf squashfs-root
+
+      - name: Check what was produced
+        run: |
+          ls -la dist/
+          for f in dist/*.deb; do dpkg-deb --info "$f" | head -12; done
+          desktop-file-validate packaging/spawn-universal.desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
+          if-no-files-found: error
+
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: |
+          cargo build --release
+          python packaging/make-icon.py
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $version = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" "/DVERSION=$version" packaging\windows-installer.nsi
+          Get-ChildItem dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.exe
+          if-no-files-found: error
+
+  publish:
+    name: Draft the release
+    # Only for a tag: a manual run is for checking the packaging, and should
+    # not create anything.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Draft
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: artifacts/**/*
+          body: |
+            Install one of the files below.
+
+            - **Linux** — `.deb` and `.rpm` install the udev rule that lets a
+              desktop user reach the keyboard; replug it afterwards. The
+              `.AppImage` runs anywhere but cannot install that rule, so run
+              this once before using it:
+
+              ```
+              sudo curl -fsSLo /etc/udev/rules.d/99-spawn.rules \
+                https://raw.githubusercontent.com/oops404/spawn-universal/main/packaging/99-spawn.rules
+              sudo udevadm control --reload-rules && sudo udevadm trigger
+              ```
+            - **macOS** — open the `.dmg` and drag the app across. It is not
+              notarised, so the first launch needs right-click then Open.
+            - **Windows** — run the installer. Close the manufacturer's
+              software first: only one program can hold the keyboard at a time.

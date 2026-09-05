@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = ["crates/spawn-protocol", "crates/spawn-app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/oops404/spawn-universal"
+authors = ["spawn-universal contributors"]
+
+[workspace.dependencies]
+# Vampir builds on gpui-ce, the crates.io release of GPUI, so the whole tree
+# comes from the registry rather than a git checkout.
+gpui = { package = "gpui-ce", version = "0.2.2" }
+# The font backend is behind `font-kit`. Without it the window lays out
+# correctly and draws no text at all.
+gpui_ce_platform = { version = "0.1", features = [
+    "font-kit",
+    "runtime_shaders",
+    "wayland",
+    "x11",
+] }
+vampir = "0.1.2"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true

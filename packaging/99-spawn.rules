@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Let desktop users configure SONiX-based SPAWN magnetic keyboards without
+# root. Install to /etc/udev/rules.d/99-spawn.rules, then:
+#
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# Unplug and replug the keyboard afterwards.
+
+# hidraw nodes (the interface this application uses)
+KERNEL=="hidraw*", ATTRS{idVendor}=="0c45", MODE="0660", TAG+="uaccess"
+
+# usb device nodes, for completeness
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0c45", MODE="0660", TAG+="uaccess"
