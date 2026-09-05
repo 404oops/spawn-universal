@@ -47,11 +47,9 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libudev-dev libasound2-dev libwayland-dev libxkbcommon-x11-dev \
-            libssl-dev libzstd-dev libvulkan-dev libgit2-dev \
-            make cmake clang mold libstdc++-12-dev file desktop-file-utils
+          packaging/linux-build-deps.sh
+          # Only the packaging steps need these.
+          sudo apt-get install -y file desktop-file-utils
 
       - name: Build
         run: |
